@@ -19,11 +19,14 @@ struct NoteRow: View {
                             .foregroundColor(.primary)
                         Text(note.content)
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                 }
                 .padding(.vertical, 4)
+            }
+            .onTapGesture {
+                print("Tapped note in NoteRow: \(note.title), ID: \(note.id)")
             }
             .contextMenu {
                 Button(action: {
@@ -62,20 +65,28 @@ struct SidebarView: View {
     var body: some View {
         List {
             Section(header: Text("Notes").font(.title2).foregroundColor(.blue)) {
-                ForEach(notes) { note in
-                    NavigationLink {
-                        NoteDetailView(note: note, viewModel: viewModel, parentNote: nil)
-                    } label: {
-                        HStack {
-                            Image(systemName: "doc.text")
-                                .foregroundColor(.blue)
-                            Text(note.title)
-                                .foregroundColor(.primary)
+                if notes.isEmpty {
+                    Text("No notes available")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(notes) { note in
+                        NavigationLink {
+                            NoteDetailView(note: note, viewModel: viewModel, parentNote: nil)
+                        } label: {
+                            HStack {
+                                Image(systemName: "doc.text")
+                                    .foregroundColor(.blue)
+                                Text(note.title)
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                        .onTapGesture {
+                            print("Tapped note in SidebarView: \(note.title), ID: \(note.id)")
                         }
                     }
-                }
-                .onDelete { offsets in
-                    viewModel.deleteNote(at: offsets, from: nil)
+                    .onDelete { offsets in
+                        viewModel.deleteNote(at: offsets, from: nil)
+                    }
                 }
             }
         }
@@ -83,13 +94,13 @@ struct SidebarView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
                     showingAddNote = true
+                    print("Tapped + button in SidebarView, showingAddNote: \(showingAddNote)")
                 }) {
                     Image(systemName: "plus")
                         .foregroundColor(.blue)
                 }
             }
         }
-        .background(Color.gray.opacity(0.05))
     }
 }
 
@@ -97,18 +108,34 @@ struct SidebarView: View {
 struct DetailView: View {
     let notes: [Note]
     let viewModel: NoteViewModel
+    @Binding var showingAddNote: Bool // Add binding to show the sheet from DetailView
     
     var body: some View {
         List {
-            ForEach(notes) { note in
-                NoteRow(note: note, viewModel: viewModel)
-            }
-            .onDelete { offsets in
-                viewModel.deleteNote(at: offsets, from: nil)
+            if notes.isEmpty {
+                Text("No notes available")
+                    .foregroundColor(.secondary)
+            } else {
+                ForEach(notes) { note in
+                    NoteRow(note: note, viewModel: viewModel)
+                }
+                .onDelete { offsets in
+                    viewModel.deleteNote(at: offsets, from: nil)
+                }
             }
         }
         .navigationTitle("NotionClone")
-        .background(Color.white)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingAddNote = true
+                    print("Tapped + button in DetailView, showingAddNote: \(showingAddNote)")
+                }) {
+                    Image(systemName: "plus")
+                        .foregroundColor(.blue)
+                }
+            }
+        }
     }
 }
 
@@ -121,10 +148,16 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(notes: viewModel.notes, viewModel: viewModel, showingAddNote: $showingAddNote)
         } detail: {
-            DetailView(notes: viewModel.notes, viewModel: viewModel)
+            DetailView(notes: viewModel.notes, viewModel: viewModel, showingAddNote: $showingAddNote)
         }
         .sheet(isPresented: $showingAddNote) {
             AddNoteView(viewModel: viewModel)
+                .onDisappear {
+                    print("AddNoteView dismissed, showingAddNote: \(showingAddNote)")
+                }
+        }
+        .onAppear {
+            print("ContentView appeared with \(viewModel.notes.count) notes")
         }
     }
 }

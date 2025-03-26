@@ -3,66 +3,103 @@ import SwiftUI
 struct AddNoteView: View {
     @ObservedObject var viewModel: NoteViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var title = ""
-    @State private var content = NSAttributedString(string: "")
-    @State private var isBold = false
-    @State private var isItalic = false
-    var parentNote: Note?
+    @State private var title: String = ""
+    @State private var attributedText: NSAttributedString = NSAttributedString(string: "")
+    @State private var isBold: Bool = false
+    @State private var isItalic: Bool = false
+    @State private var isUnderlined: Bool = false
+    @State private var textColor: UIColor? = nil
+    @State private var backgroundColor: UIColor? = nil
+    @State private var adjustFontSize: Int = 0
+    var parentNote: Note? = nil
     
     var body: some View {
         NavigationView {
-            VStack {
-                Form {
-                    TextField("Title", text: $title)
-                        .font(.headline)
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                    RichTextEditor(attributedText: $content, isBold: $isBold, isItalic: $isItalic)
-                        .frame(height: 200)
-                        .padding()
-                        .background(Color.gray.opacity(0.05))
-                        .cornerRadius(8)
+            Form {
+                Section(header: Text("Title")) {
+                    TextField("Enter title", text: $title)
                 }
-                HStack {
-                    Button(action: { isBold.toggle() }) {
-                        Image(systemName: isBold ? "bold.fill" : "bold")
-                            .foregroundColor(.blue)
-                            .padding()
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    Button(action: { isItalic.toggle() }) {
-                        Image(systemName: isItalic ? "italic.fill" : "italic")
-                            .foregroundColor(.blue)
-                            .padding()
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    Spacer()
+                
+                Section(header: Text("Content")) {
+                    RichTextEditor(
+                        attributedText: $attributedText,
+                        isBold: $isBold,
+                        isItalic: $isItalic,
+                        isUnderlined: $isUnderlined,
+                        textColor: $textColor,
+                        backgroundColor: $backgroundColor,
+                        adjustFontSize: $adjustFontSize
+                    )
+                    .frame(height: 200)
                 }
-                .padding()
+                
+                Section {
+                    HStack {
+                        Button(action: {
+                            isBold.toggle()
+                        }) {
+                            Text("B")
+                                .bold()
+                                .frame(width: 30, height: 30)
+                                .background(isBold ? Color.gray : Color.clear)
+                                .clipShape(Circle())
+                        }
+                        
+                        Button(action: {
+                            isItalic.toggle()
+                        }) {
+                            Text("I")
+                                .italic()
+                                .frame(width: 30, height: 30)
+                                .background(isItalic ? Color.gray : Color.clear)
+                                .clipShape(Circle())
+                        }
+                        
+                        Button(action: {
+                            isUnderlined.toggle()
+                        }) {
+                            Text("U")
+                                .underline()
+                                .frame(width: 30, height: 30)
+                                .background(isUnderlined ? Color.gray : Color.clear)
+                                .clipShape(Circle())
+                        }
+                        
+                        Button(action: {
+                            adjustFontSize = 1
+                        }) {
+                            Text("A+")
+                                .frame(width: 30, height: 30)
+                                .background(Color.clear)
+                                .clipShape(Circle())
+                        }
+                        
+                        Button(action: {
+                            adjustFontSize = -1
+                        }) {
+                            Text("A-")
+                                .frame(width: 30, height: 30)
+                                .background(Color.clear)
+                                .clipShape(Circle())
+                        }
+                    }
+                }
             }
-            .navigationTitle(parentNote == nil ? "New Note" : "New Sub-Note")
+            .navigationTitle("New Note")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.red)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        if !title.isEmpty {
-                            viewModel.addNote(title: title, content: content.string, parentNote: parentNote)
-                            dismiss()
-                        }
+                        viewModel.addNote(title: title.isEmpty ? "Untitled" : title, content: attributedText.string, parentNote: parentNote)
+                        dismiss()
                     }
-                    .foregroundColor(.blue)
-                    .disabled(title.isEmpty)
+                    .disabled(title.isEmpty && attributedText.string.isEmpty)
                 }
             }
-            .background(Color.white)
         }
     }
 }
