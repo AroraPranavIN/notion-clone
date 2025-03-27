@@ -1,84 +1,66 @@
 import Foundation
-import SwiftUI
 
 class NoteViewModel: ObservableObject {
     @Published var notes: [Note] = []
+    private let notesKey = "notesKey"
     
     init() {
         loadNotes()
     }
     
-    func addNote(title: String, content: String, parentNote: Note? = nil) {
-        let newNote = Note(title: title, content: content)
+    func addNote(title: String, attributedContent: NSAttributedString, parentNote: Note?) {
+        let newNote = Note(
+            title: title,
+            attributedContent: attributedContent,
+            parentID: parentNote?.id
+        )
+        
         if let parent = parentNote {
-            if let index = notes.firstIndex(where: { $0.id == parent.id }) {
-                notes[index].subNotes.append(newNote)
+            if let parentIndex = notes.firstIndex(where: { $0.id == parent.id }) {
+                var updatedParent = notes[parentIndex]
+                updatedParent.children = (updatedParent.children ?? []) + [newNote]
+                notes[parentIndex] = updatedParent
             }
         } else {
             notes.append(newNote)
         }
+        
         saveNotes()
-        print("Added note: \(newNote.title), Total notes: \(notes.count)")
     }
     
-    func updateNote(_ note: Note, parentNote: Note? = nil) {
-        if let parent = parentNote {
-            if let parentIndex = notes.firstIndex(where: { $0.id == parent.id }),
-               let subNoteIndex = notes[parentIndex].subNotes.firstIndex(where: { $0.id == note.id }) {
-                notes[parentIndex].subNotes[subNoteIndex] = note
-            }
-        } else {
-            if let index = notes.firstIndex(where: { $0.id == note.id }) {
-                notes[index] = note
-            }
+    func updateNote(_ note: Note) {
+        if let index = notes.firstIndex(where: { $0.id == note.id }) {
+            notes[index] = note
+            saveNotes()
         }
-        saveNotes()
-        print("Updated note: \(note.title)")
     }
     
     func deleteNote(at offsets: IndexSet, from parentNote: Note?) {
         if let parent = parentNote {
-            if let index = notes.firstIndex(where: { $0.id == parent.id }) {
-                notes[index].subNotes.remove(atOffsets: offsets)
+            if let parentIndex = notes.firstIndex(where: { $0.id == parent.id }) {
+                var updatedParent = notes[parentIndex]
+                updatedParent.children?.remove(atOffsets: offsets)
+                notes[parentIndex] = updatedParent
             }
         } else {
             notes.remove(atOffsets: offsets)
         }
+        
         saveNotes()
-        print("Deleted notes at offsets: \(offsets), Total notes: \(notes.count)")
-    }
-    
-    private func saveNotes() {
-        do {
-            let data = try JSONEncoder().encode(notes)
-            UserDefaults.standard.set(data, forKey: "notes")
-            print("Saved notes successfully: \(notes.count) notes")
-        } catch {
-            print("Failed to save notes: \(error)")
-        }
     }
     
     private func loadNotes() {
-        if let data = UserDefaults.standard.data(forKey: "notes") {
-            print("Raw UserDefaults data: \(data)") // Debug log
-            do {
-                let savedNotes = try JSONDecoder().decode([Note].self, from: data)
-                notes = savedNotes
-                print("Loaded \(notes.count) notes successfully")
-            } catch {
-                print("Failed to load notes: \(error)")
-                notes = []
-            }
+        if let data = UserDefaults.standard.data(forKey: notesKey),
+           let savedNotes = try? JSONDecoder().decode([Note].self, from: data) {
+            self.notes = savedNotes
         } else {
-            print("No saved notes found in UserDefaults")
-            notes = []
+            self.notes = []
         }
     }
     
-    // Temporary method to reset UserDefaults
-    func resetNotes() {
-        UserDefaults.standard.removeObject(forKey: "notes")
-        notes = []
-        print("Reset UserDefaults, notes cleared")
+    private func saveNotes() {
+        if let data = try? JSONEncoder().encode(notes) {
+            UserDefaults.standard.set(data, forKey: notesKey)
+        }
     }
 }

@@ -1,10 +1,11 @@
 import SwiftUI
 
-struct AddNoteView: View {
+struct EditNoteView: View {
     @ObservedObject var viewModel: NoteViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var title: String = ""
-    @State private var attributedText: NSAttributedString = NSAttributedString(string: "")
+    let note: Note
+    @State private var title: String
+    @State private var attributedText: NSAttributedString
     @State private var isBold: Bool = false
     @State private var isItalic: Bool = false
     @State private var isUnderlined: Bool = false
@@ -13,14 +14,20 @@ struct AddNoteView: View {
     @State private var adjustFontSize: Int = 0
     @State private var showingTextColorPicker: Bool = false
     @State private var showingBackgroundColorPicker: Bool = false
-    var parentID: UUID? = nil // Use parentID instead of parentNote
+    
+    init(viewModel: NoteViewModel, note: Note) {
+        self.viewModel = viewModel
+        self.note = note
+        self._title = State(initialValue: note.title)
+        self._attributedText = State(initialValue: note.attributedContent)
+    }
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Title")) {
                     TextField("Enter title", text: $title)
-                        .font(.system(size: 28, weight: .bold))
+                        .font(.system(size: 28, weight: .bold)) // Increase to 28 points and make bold
                 }
                 
                 Section(header: Text("Content")) {
@@ -129,7 +136,7 @@ struct AddNoteView: View {
                     }
                 }
             }
-            .navigationTitle("New Note")
+            .navigationTitle("Edit Note")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -138,9 +145,13 @@ struct AddNoteView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        // Find the parent note using parentID if needed
-                        let parentNote = parentID != nil ? viewModel.notes.first(where: { $0.id == parentID }) : nil
-                        viewModel.addNote(title: title.isEmpty ? "Untitled" : title, attributedContent: attributedText, parentNote: parentNote)
+                        // Update the note in the view model
+                        if let index = viewModel.notes.firstIndex(where: { $0.id == note.id }) {
+                            var updatedNote = viewModel.notes[index]
+                            updatedNote.title = title.isEmpty ? "Untitled" : title
+                            updatedNote.attributedContent = attributedText
+                            viewModel.notes[index] = updatedNote
+                        }
                         dismiss()
                     }
                     .disabled(title.isEmpty && attributedText.string.isEmpty)
@@ -150,36 +161,8 @@ struct AddNoteView: View {
     }
 }
 
-struct ColorPickerView: View {
-    @Binding var selectedColor: UIColor?
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ColorPicker("Select Color", selection: Binding(
-                get: { selectedColor.map { Color(uiColor: $0) } ?? Color.clear },
-                set: { newColor in selectedColor = UIColor(newColor) }
-            ))
-            .padding()
-            .navigationTitle("Pick a Color")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct AddNoteView_Previews: PreviewProvider {
+struct EditNoteView_Previews: PreviewProvider {
     static var previews: some View {
-        AddNoteView(viewModel: NoteViewModel())
+        EditNoteView(viewModel: NoteViewModel(), note: Note(title: "Sample Note", attributedContent: NSAttributedString(string: "Sample content")))
     }
 }

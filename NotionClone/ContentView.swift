@@ -8,7 +8,7 @@ struct NoteRow: View {
     var body: some View {
         VStack {
             NavigationLink {
-                NoteDetailView(note: note, viewModel: viewModel, parentNote: nil)
+                NoteDetailView(viewModel: viewModel, note: note)
             } label: {
                 HStack {
                     Image(systemName: "doc.text")
@@ -17,7 +17,7 @@ struct NoteRow: View {
                         Text(note.title)
                             .font(.headline)
                             .foregroundColor(.primary)
-                        Text(note.content)
+                        Text(note.attributedContent.string)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
@@ -37,12 +37,12 @@ struct NoteRow: View {
                 }
             }
             .sheet(isPresented: $showingAddSubNote) {
-                AddNoteView(viewModel: viewModel, parentNote: note)
+                AddNoteView(viewModel: viewModel, parentID: note.id) // Use parentID
             }
             
-            if !note.subNotes.isEmpty {
+            if let children = note.children, !children.isEmpty {
                 List {
-                    ForEach(note.subNotes) { subNote in
+                    ForEach(children) { subNote in
                         NoteRow(note: subNote, viewModel: viewModel)
                     }
                     .onDelete { offsets in
@@ -71,7 +71,7 @@ struct SidebarView: View {
                 } else {
                     ForEach(notes) { note in
                         NavigationLink {
-                            NoteDetailView(note: note, viewModel: viewModel, parentNote: nil)
+                            NoteDetailView(viewModel: viewModel, note: note)
                         } label: {
                             HStack {
                                 Image(systemName: "doc.text")
@@ -151,7 +151,7 @@ struct ContentView: View {
             DetailView(notes: viewModel.notes, viewModel: viewModel, showingAddNote: $showingAddNote)
         }
         .sheet(isPresented: $showingAddNote) {
-            AddNoteView(viewModel: viewModel)
+            AddNoteView(viewModel: viewModel) // No parentID for top-level notes
                 .onDisappear {
                     print("AddNoteView dismissed, showingAddNote: \(showingAddNote)")
                 }
