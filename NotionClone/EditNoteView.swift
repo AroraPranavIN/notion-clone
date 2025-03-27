@@ -5,7 +5,7 @@ struct EditNoteView: View {
     @Environment(\.dismiss) var dismiss
     let note: Note
     @State private var title: String
-    @State private var attributedText: NSAttributedString
+    @State private var attributedContent: NSAttributedString
     @State private var isBold: Bool = false
     @State private var isItalic: Bool = false
     @State private var isUnderlined: Bool = false
@@ -19,122 +19,146 @@ struct EditNoteView: View {
         self.viewModel = viewModel
         self.note = note
         self._title = State(initialValue: note.title)
-        self._attributedText = State(initialValue: note.attributedContent)
+        self._attributedContent = State(initialValue: note.attributedContent)
     }
     
     var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Title")) {
-                    TextField("Enter title", text: $title)
-                        .font(.system(size: 28, weight: .bold)) // Increase to 28 points and make bold
-                }
+        NavigationStack {
+            VStack {
+                TextField("Title", text: $title)
+                    .font(.title)
+                    .padding()
                 
-                Section(header: Text("Content")) {
-                    RichTextEditor(
-                        attributedText: $attributedText,
-                        isBold: $isBold,
-                        isItalic: $isItalic,
-                        isUnderlined: $isUnderlined,
-                        textColor: $textColor,
-                        backgroundColor: $backgroundColor,
-                        adjustFontSize: $adjustFontSize
-                    )
-                    .frame(height: 200)
-                }
+                RichTextEditor(
+                    attributedText: $attributedContent,
+                    isBold: $isBold,
+                    isItalic: $isItalic,
+                    isUnderlined: $isUnderlined,
+                    textColor: $textColor,
+                    backgroundColor: $backgroundColor,
+                    adjustFontSize: $adjustFontSize
+                )
+                .padding()
                 
-                Section(header: Text("Formatting")) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            // Bold Button
-                            Button(action: {
-                                isBold.toggle()
-                            }) {
-                                Text("B")
-                                    .bold()
-                                    .frame(width: 30, height: 30)
-                                    .background(isBold ? Color.gray : Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
+                // Formatting toolbar
+                HStack(spacing: 15) {
+                    // Bold
+                    Button(action: {
+                        isBold.toggle()
+                    }) {
+                        Image(systemName: isBold ? "bold.fill" : "bold")
+                            .foregroundColor(isBold ? .blue : .gray)
+                            .padding(8)
+                            .background(isBold ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
+                    // Italic
+                    Button(action: {
+                        isItalic.toggle()
+                    }) {
+                        Image(systemName: isItalic ? "italic.fill" : "italic")
+                            .foregroundColor(isItalic ? .blue : .gray)
+                            .padding(8)
+                            .background(isItalic ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
+                    // Underline
+                    Button(action: {
+                        isUnderlined.toggle()
+                    }) {
+                        Image(systemName: isUnderlined ? "underline.fill" : "underline")
+                            .foregroundColor(isUnderlined ? .blue : .gray)
+                            .padding(8)
+                            .background(isUnderlined ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
+                    // Text Color
+                    Button(action: {
+                        showingTextColorPicker = true
+                    }) {
+                        Image(systemName: "textformat")
+                            .foregroundColor(textColor != nil ? Color(textColor!) : .gray)
+                            .padding(8)
+                            .background(textColor != nil ? Color(textColor!).opacity(0.1) : Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .sheet(isPresented: $showingTextColorPicker) {
+                        VStack {
+                            ColorPicker("Text Color", selection: Binding(
+                                get: { Color(textColor ?? .black) },
+                                set: { newColor in
+                                    textColor = UIColor(newColor)
+                                    print("Selected textColor: \(String(describing: textColor))")
+                                }
+                            ))
+                            .padding()
                             
-                            // Italic Button
-                            Button(action: {
-                                isItalic.toggle()
-                            }) {
-                                Text("I")
-                                    .italic()
-                                    .frame(width: 30, height: 30)
-                                    .background(isItalic ? Color.gray : Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
+                            Button("Done") {
+                                showingTextColorPicker = false
                             }
-                            
-                            // Underline Button
-                            Button(action: {
-                                isUnderlined.toggle()
-                            }) {
-                                Text("U")
-                                    .underline()
-                                    .frame(width: 30, height: 30)
-                                    .background(isUnderlined ? Color.gray : Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
-                            
-                            // Font Size Increase Button
-                            Button(action: {
-                                adjustFontSize = 1
-                            }) {
-                                Text("A+")
-                                    .frame(width: 30, height: 30)
-                                    .background(Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
-                            
-                            // Font Size Decrease Button
-                            Button(action: {
-                                adjustFontSize = -1
-                            }) {
-                                Text("A-")
-                                    .frame(width: 30, height: 30)
-                                    .background(Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
-                            
-                            // Text Color Picker Button
-                            Button(action: {
-                                showingTextColorPicker = true
-                            }) {
-                                Image(systemName: "textformat")
-                                    .frame(width: 30, height: 30)
-                                    .background(textColor != nil ? Color(uiColor: textColor!) : Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
-                            .sheet(isPresented: $showingTextColorPicker) {
-                                ColorPickerView(selectedColor: $textColor)
-                            }
-                            
-                            // Background Color Picker Button
-                            Button(action: {
-                                showingBackgroundColorPicker = true
-                            }) {
-                                Image(systemName: "paintbrush")
-                                    .frame(width: 30, height: 30)
-                                    .background(backgroundColor != nil ? Color(uiColor: backgroundColor!) : Color.clear)
-                                    .foregroundColor(.primary)
-                                    .clipShape(Circle())
-                            }
-                            .sheet(isPresented: $showingBackgroundColorPicker) {
-                                ColorPickerView(selectedColor: $backgroundColor)
-                            }
+                            .padding()
+                            .foregroundColor(.blue)
                         }
-                        .padding(.horizontal)
+                    }
+                    
+                    // Background Color
+                    Button(action: {
+                        showingBackgroundColorPicker = true
+                    }) {
+                        Image(systemName: "paintbrush")
+                            .foregroundColor(backgroundColor != nil ? Color(backgroundColor!) : .gray)
+                            .padding(8)
+                            .background(backgroundColor != nil ? Color(backgroundColor!).opacity(0.1) : Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .sheet(isPresented: $showingBackgroundColorPicker) {
+                        VStack {
+                            ColorPicker("Background Color", selection: Binding(
+                                get: { Color(backgroundColor ?? .clear) },
+                                set: { newColor in
+                                    backgroundColor = UIColor(newColor)
+                                    print("Selected backgroundColor: \(String(describing: backgroundColor))")
+                                }
+                            ))
+                            .padding()
+                            
+                            Button("Done") {
+                                showingBackgroundColorPicker = false
+                            }
+                            .padding()
+                            .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    // Font Size Adjustment
+                    Button(action: {
+                        adjustFontSize -= 1
+                    }) {
+                        Image(systemName: "textformat.size.smaller")
+                            .foregroundColor(.gray)
+                            .padding(8)
+                            .background(Color.gray.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
+                    Button(action: {
+                        adjustFontSize += 1
+                    }) {
+                        Image(systemName: "textformat.size.larger")
+                            .foregroundColor(.gray)
+                            .padding(8)
+                            .background(Color.gray.opacity(0.1))
+                            .clipShape(Circle())
                     }
                 }
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(10)
+                .shadow(radius: 2)
+                .padding(.horizontal)
             }
             .navigationTitle("Edit Note")
             .toolbar {
@@ -145,16 +169,16 @@ struct EditNoteView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        // Update the note in the view model
-                        if let index = viewModel.notes.firstIndex(where: { $0.id == note.id }) {
-                            var updatedNote = viewModel.notes[index]
-                            updatedNote.title = title.isEmpty ? "Untitled" : title
-                            updatedNote.attributedContent = attributedText
-                            viewModel.notes[index] = updatedNote
-                        }
+                        let updatedNote = Note(
+                            id: note.id,
+                            title: title.isEmpty ? "Untitled Note" : title,
+                            attributedContent: attributedContent,
+                            parentNote: note.parentNote
+                        )
+                        viewModel.updateNote(updatedNote)
                         dismiss()
                     }
-                    .disabled(title.isEmpty && attributedText.string.isEmpty)
+                    .disabled(attributedContent.string.isEmpty)
                 }
             }
         }

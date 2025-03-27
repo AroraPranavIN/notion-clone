@@ -21,6 +21,12 @@ struct RichTextEditor: UIViewRepresentable {
             if textView.attributedText != parent.attributedText {
                 parent.attributedText = textView.attributedText
                 print("textViewDidChange: Updated attributedText with font size: \(textView.attributedText.fontSize(at: 0) ?? 0)")
+                let range = NSRange(location: 0, length: textView.attributedText.length)
+                textView.attributedText.enumerateAttribute(.backgroundColor, in: range, options: []) { (value, range, stop) in
+                    if let color = value as? UIColor {
+                        print("textViewDidChange: Found background color \(color) in range \(range)")
+                    }
+                }
             }
         }
         
@@ -35,14 +41,19 @@ struct RichTextEditor: UIViewRepresentable {
                         parent.isItalic = font.fontDescriptor.symbolicTraits.contains(.traitItalic)
                         parent.isUnderlined = (attributes[.underlineStyle] as? Int) == NSUnderlineStyle.single.rawValue
                     }
-                    parent.textColor = attributes[.foregroundColor] as? UIColor
-                    parent.backgroundColor = attributes[.backgroundColor] as? UIColor
+                    if let currentTextColor = attributes[.foregroundColor] as? UIColor {
+                        parent.textColor = currentTextColor
+                    }
+                    if let currentBackgroundColor = attributes[.backgroundColor] as? UIColor {
+                        parent.backgroundColor = currentBackgroundColor
+                    }
+                    print("Updated textColor from selection: \(String(describing: parent.textColor))")
+                    print("Updated backgroundColor from selection: \(String(describing: parent.backgroundColor))")
                 } else {
                     parent.isBold = false
                     parent.isItalic = false
                     parent.isUnderlined = false
-                    parent.textColor = nil
-                    parent.backgroundColor = nil
+                    print("No attributes to update from selection")
                 }
             }
         }
@@ -58,36 +69,32 @@ struct RichTextEditor: UIViewRepresentable {
         textView.delegate = context.coordinator
         textView.adjustsFontForContentSizeCategory = false
         
-        // Set the default font size to 20 for better readability
         let defaultFontSize: CGFloat = 20
         let defaultFont = UIFont(name: "Helvetica", size: defaultFontSize) ?? UIFont.systemFont(ofSize: defaultFontSize)
-        var defaultAttributes: [NSAttributedString.Key: Any] = [
-            .font: defaultFont
+        let defaultTextColor = colorScheme == .dark ? UIColor.white : UIColor.black
+        let defaultAttributes: [NSAttributedString.Key: Any] = [
+            .font: defaultFont,
+            .foregroundColor: defaultTextColor
         ]
         
-        defaultAttributes[.foregroundColor] = UIColor { traitCollection in
-            switch traitCollection.userInterfaceStyle {
-            case .dark:
-                return .white
-            default:
-                return .black
-            }
-        }
-        
-        // Set the typing attributes to ensure newly typed text uses the default font
         textView.typingAttributes = defaultAttributes
-        print("makeUIView: Set typingAttributes with font size: \(defaultFontSize)")
+        print("makeUIView: Set typingAttributes with font size: \(defaultFontSize), textColor: \(defaultTextColor)")
         
-        // Apply the default attributes to the attributedText
         let mutableText = NSMutableAttributedString(attributedString: attributedText)
         let fullRange = NSRange(location: 0, length: mutableText.length)
         
-        // If the attributedText is empty or has no font, apply the default font
         var hasFont = false
+        var hasTextColor = false
         if mutableText.length > 0 {
             mutableText.enumerateAttribute(.font, in: fullRange, options: []) { (value, range, stop) in
                 if value != nil {
                     hasFont = true
+                    stop.pointee = true
+                }
+            }
+            mutableText.enumerateAttribute(.foregroundColor, in: fullRange, options: []) { (value, range, stop) in
+                if value != nil {
+                    hasTextColor = true
                     stop.pointee = true
                 }
             }
@@ -96,13 +103,14 @@ struct RichTextEditor: UIViewRepresentable {
         if !hasFont {
             mutableText.addAttribute(.font, value: defaultFont, range: fullRange)
             print("makeUIView: Applied default font size \(defaultFontSize) to empty or font-less attributedText")
-        } else {
-            print("makeUIView: AttributedText already has a font, skipping default font application")
+        }
+        if !hasTextColor {
+            mutableText.addAttribute(.foregroundColor, value: defaultTextColor, range: fullRange)
+            print("makeUIView: Applied default text color \(defaultTextColor) to empty or color-less attributedText")
         }
         
-        mutableText.addAttribute(.foregroundColor, value: defaultAttributes[.foregroundColor]!, range: fullRange)
         textView.attributedText = mutableText
-        self.attributedText = mutableText // Update the binding to ensure consistency
+        self.attributedText = mutableText
         
         print("makeUIView: Initial font size: \(defaultFont.pointSize)")
         if mutableText.length > 0 {
@@ -113,14 +121,14 @@ struct RichTextEditor: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UITextView, context: Context) {
-        print("updateUIView called with textColor: \(String(describing: textColor)), backgroundColor: \(String(describing: backgroundColor))")
+        print("updateUIView called with textColor: \(String(describing: textColor)), backgroundColor: \(String(describing: backgroundColor)), adjustFontSize: \(adjustFontSize)")
         
         let selectedRange = uiView.selectedTextRange
         let mutableAttributedText = NSMutableAttributedString(attributedString: attributedText)
         
-        // Ensure the attributedText has the default font size if no font is specified
         let fullRange = NSRange(location: 0, length: mutableAttributedText.length)
         var hasFont = false
+        var hasTextColor = false
         if mutableAttributedText.length > 0 {
             mutableAttributedText.enumerateAttribute(.font, in: fullRange, options: []) { (value, range, stop) in
                 if value != nil {
@@ -128,26 +136,30 @@ struct RichTextEditor: UIViewRepresentable {
                     stop.pointee = true
                 }
             }
+            mutableAttributedText.enumerateAttribute(.foregroundColor, in: fullRange, options: []) { (value, range, stop) in
+                if value != nil {
+                    hasTextColor = true
+                    stop.pointee = true
+                }
+            }
         }
         
+        let defaultTextColor = colorScheme == .dark ? UIColor.white : UIColor.black
         if !hasFont {
             let defaultFontSize: CGFloat = 20
             let defaultFont = UIFont(name: "Helvetica", size: defaultFontSize) ?? UIFont.systemFont(ofSize: defaultFontSize)
             mutableAttributedText.addAttribute(.font, value: defaultFont, range: fullRange)
             print("updateUIView: Applied default font size \(defaultFontSize) to font-less attributedText")
             
-            // Update typingAttributes to ensure new text uses the default font
             uiView.typingAttributes = [
                 .font: defaultFont,
-                .foregroundColor: UIColor { traitCollection in
-                    switch traitCollection.userInterfaceStyle {
-                    case .dark:
-                        return .white
-                    default:
-                        return .black
-                    }
-                }
+                .foregroundColor: defaultTextColor
             ]
+        }
+        // Only apply default text color if no foregroundColor is set
+        if !hasTextColor {
+            mutableAttributedText.addAttribute(.foregroundColor, value: defaultTextColor, range: fullRange)
+            print("updateUIView: Applied default text color \(defaultTextColor) to color-less attributedText")
         }
         
         if let selectedRange = selectedRange, !selectedRange.isEmpty {
@@ -160,7 +172,7 @@ struct RichTextEditor: UIViewRepresentable {
                 nsRange.length = mutableAttributedText.length - nsRange.location
             }
             
-            var fontSize: CGFloat = 20 // Default to 20 if no font size is found
+            var fontSize: CGFloat = 20
             var isCurrentlyBold = false
             var isCurrentlyItalic = false
             var isCurrentlyUnderlined = false
@@ -201,16 +213,18 @@ struct RichTextEditor: UIViewRepresentable {
             
             let newBoldState = hasMixedBold ? isBold : (isBold != isCurrentlyBold ? !isCurrentlyBold : isCurrentlyBold)
             let newItalicState = hasMixedItalic ? isItalic : (isItalic != isCurrentlyItalic ? !isCurrentlyItalic : isCurrentlyItalic)
-            let newUnderlineState = hasMixedUnderline ? isUnderlined : (isUnderlined != isCurrentlyUnderlined ? !isCurrentlyUnderlined : isCurrentlyUnderlined)
+            let newUnderlineState = hasMixedUnderline ? isUnderlined : (isUnderlined != isCurrentlyUnderlined ? !isUnderlined : isCurrentlyUnderlined)
             
             self.isBold = newBoldState
             self.isItalic = newItalicState
             self.isUnderlined = newUnderlineState
             print("New bold state: \(newBoldState), New italic state: \(newItalicState), New underline state: \(newUnderlineState)")
             
+            // Apply font size adjustment
             if adjustFontSize != 0 {
                 fontSize = max(8, fontSize + CGFloat(adjustFontSize * 2))
-                self.adjustFontSize = 0
+                print("Adjusted font size to: \(fontSize)")
+                self.adjustFontSize = 0 // Reset after applying
             }
             
             let newFont: UIFont
@@ -229,34 +243,66 @@ struct RichTextEditor: UIViewRepresentable {
                 mutableAttributedText.addAttribute(.font, value: newFont, range: nsRange)
                 print("Applied font: \(newFont.fontName), size: \(newFont.pointSize)")
                 
+                // Apply underline
                 if newUnderlineState {
                     mutableAttributedText.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: nsRange)
-                    print("Applied underline")
+                    uiView.typingAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+                    print("Applied underline to range: \(nsRange)")
                 } else {
                     mutableAttributedText.removeAttribute(.underlineStyle, range: nsRange)
-                    print("Removed underline")
+                    uiView.typingAttributes.removeValue(forKey: .underlineStyle)
+                    print("Removed underline from range: \(nsRange)")
                 }
                 
+                // Apply text color
                 if let textColor = textColor {
-                    mutableAttributedText.addAttribute(.foregroundColor, value: textColor, range: nsRange)
-                    print("Applied text color: \(textColor)")
-                    // Update typingAttributes with the new text color
-                    uiView.typingAttributes[.foregroundColor] = textColor
+                    let compatibleTextColor = UIColor(cgColor: textColor.cgColor)
+                    mutableAttributedText.addAttribute(.foregroundColor, value: compatibleTextColor, range: nsRange)
+                    uiView.typingAttributes[.foregroundColor] = compatibleTextColor
+                    print("Applied text color: \(compatibleTextColor) to range: \(nsRange)")
                 }
                 
+                // Apply background color
                 if let backgroundColor = backgroundColor {
-                    mutableAttributedText.addAttribute(.backgroundColor, value: backgroundColor, range: nsRange)
-                    print("Applied background color: \(backgroundColor)")
-                    // Update typingAttributes with the new background color
-                    uiView.typingAttributes[.backgroundColor] = backgroundColor
+                    let compatibleBackgroundColor = UIColor(cgColor: backgroundColor.cgColor)
+                    mutableAttributedText.addAttribute(.backgroundColor, value: compatibleBackgroundColor, range: nsRange)
+                    uiView.typingAttributes[.backgroundColor] = compatibleBackgroundColor
+                    print("Applied background color: \(compatibleBackgroundColor) to range: \(nsRange)")
                 } else {
                     mutableAttributedText.removeAttribute(.backgroundColor, range: nsRange)
-                    print("Removed background color")
-                    // Remove background color from typingAttributes
                     uiView.typingAttributes.removeValue(forKey: .backgroundColor)
+                    print("Removed background color from range: \(nsRange)")
                 }
             } else {
                 print("No valid range to apply attributes: \(nsRange)")
+                if let textColor = textColor {
+                    let compatibleTextColor = UIColor(cgColor: textColor.cgColor)
+                    uiView.typingAttributes[.foregroundColor] = compatibleTextColor
+                    print("Set typingAttributes text color: \(compatibleTextColor)")
+                } else {
+                    uiView.typingAttributes[.foregroundColor] = defaultTextColor
+                    print("Set typingAttributes text color to default: \(defaultTextColor)")
+                }
+                
+                if let backgroundColor = backgroundColor {
+                    let compatibleBackgroundColor = UIColor(cgColor: backgroundColor.cgColor)
+                    uiView.typingAttributes[.backgroundColor] = compatibleBackgroundColor
+                    print("Set typingAttributes background color: \(compatibleBackgroundColor)")
+                } else {
+                    uiView.typingAttributes.removeValue(forKey: .backgroundColor)
+                    print("Cleared typingAttributes background color")
+                }
+                
+                if isUnderlined {
+                    uiView.typingAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+                    print("Set typingAttributes underline")
+                } else {
+                    uiView.typingAttributes.removeValue(forKey: .underlineStyle)
+                    print("Cleared typingAttributes underline")
+                }
+                
+                uiView.typingAttributes[.font] = newFont
+                print("Set typingAttributes font size: \(newFont.pointSize)")
             }
             
             print("New font size after formatting: \(newFont.pointSize)")
@@ -264,36 +310,62 @@ struct RichTextEditor: UIViewRepresentable {
             if mutableAttributedText != uiView.attributedText {
                 uiView.attributedText = mutableAttributedText
                 self.attributedText = mutableAttributedText
+                print("Updated attributedText with formatting")
+                mutableAttributedText.enumerateAttribute(.backgroundColor, in: fullRange, options: []) { (value, range, stop) in
+                    if let color = value as? UIColor {
+                        print("Final attributedText has background color \(color) in range \(range)")
+                    }
+                }
+                mutableAttributedText.enumerateAttribute(.foregroundColor, in: fullRange, options: []) { (value, range, stop) in
+                    if let color = value as? UIColor {
+                        print("Final attributedText has text color \(color) in range \(range)")
+                    }
+                }
             }
             
             uiView.selectedTextRange = selectedRange
         } else {
             print("No selection to apply formatting")
-            let defaultTextColor = UIColor { traitCollection in
-                switch traitCollection.userInterfaceStyle {
-                case .dark:
-                    return .white
-                default:
-                    return .black
-                }
-            }
             let mutableText = NSMutableAttributedString(attributedString: attributedText)
-            let fullRange = NSRange(location: 0, length: mutableText.length)
             
-            // Only apply default text color to ranges that lack a foregroundColor attribute
-            var needsUpdate = false
-            mutableText.enumerateAttribute(.foregroundColor, in: fullRange, options: []) { (value, range, stop) in
-                if value == nil {
-                    mutableText.addAttribute(.foregroundColor, value: defaultTextColor, range: range)
-                    needsUpdate = true
-                }
+            if let backgroundColor = backgroundColor {
+                let compatibleBackgroundColor = UIColor(cgColor: backgroundColor.cgColor)
+                uiView.typingAttributes[.backgroundColor] = compatibleBackgroundColor
+                print("Set typingAttributes background color (no selection): \(compatibleBackgroundColor)")
+            } else {
+                uiView.typingAttributes.removeValue(forKey: .backgroundColor)
+                print("Cleared typingAttributes background color (no selection)")
             }
             
-            if needsUpdate {
-                if mutableText != uiView.attributedText {
-                    uiView.attributedText = mutableText
-                    self.attributedText = mutableText
-                }
+            if let textColor = textColor {
+                let compatibleTextColor = UIColor(cgColor: textColor.cgColor)
+                uiView.typingAttributes[.foregroundColor] = compatibleTextColor
+                print("Set typingAttributes text color (no selection): \(compatibleTextColor)")
+            } else {
+                uiView.typingAttributes[.foregroundColor] = defaultTextColor
+                print("Set typingAttributes text color to default (no selection): \(defaultTextColor)")
+            }
+            
+            if isUnderlined {
+                uiView.typingAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+                print("Set typingAttributes underline (no selection)")
+            } else {
+                uiView.typingAttributes.removeValue(forKey: .underlineStyle)
+                print("Cleared typingAttributes underline (no selection)")
+            }
+            
+            if adjustFontSize != 0 {
+                let defaultFontSize: CGFloat = 20
+                let newFontSize = max(8, defaultFontSize + CGFloat(adjustFontSize * 2))
+                let newFont = UIFont(name: "Helvetica", size: newFontSize) ?? UIFont.systemFont(ofSize: newFontSize)
+                uiView.typingAttributes[.font] = newFont
+                print("Set typingAttributes font size (no selection): \(newFontSize)")
+                self.adjustFontSize = 0
+            }
+            
+            if mutableText != uiView.attributedText {
+                uiView.attributedText = mutableText
+                self.attributedText = mutableText
             }
         }
     }
@@ -390,7 +462,6 @@ extension NSAttributedString {
         return isEqual
     }
     
-    // Helper to get the font size at a specific index
     func fontSize(at index: Int) -> CGFloat? {
         if index >= length {
             return nil
